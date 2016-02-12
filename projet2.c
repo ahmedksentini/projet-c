@@ -2,280 +2,138 @@
 #include <stdlib.h>
 #include <string.h>
 
-struct data1
+
+
+//question 5) 
+
+leaf* product_needs(int coeff,leaf *scope,leaf *Branch,article *head,article **list,int *check_realisable)
 {
-    char code[5];
-    char designation[15];
-    char code_famille[5];
-    char prix_achat[10];
-    char code_fournisseur[5];
-    char quantite_en_stock[5];
-};
-typedef struct data1 DATA1;
+	leaf *p;
+	int c;
+	c= 0;
+	p=NULL;
 
-struct article
-{
-    DATA1 d;
-    struct article *next;
-};
-typedef struct article ARTICLE;
+	if (scope->rightChild && scope->leftChild)
+	{	
+		c = article_calculation(coeff,scope->key,scope->quantite,head,list,check_realisable,1);//1 to notice that the article is a semi-final product
 
-struct data2
-{
-    char code[5];
-    char designation[15];
-};
-typedef struct data2 DATA2;
+		if(c)
+		{
 
-struct famille
-{
-    DATA2 d;
-    struct famille *next;
-};
-typedef struct famille FAMILLE;
+			p=(product_needs(c,scope->leftChild,scope,head,list,check_realisable));
+			if (p)
+				product_needs(coeff,p->rightChild,Branch,head,list,check_realisable);	
+		}
+	
 
-struct data3
-{
-    char code[5];
-    char raison_sociale[15];
-};
-typedef struct data3 DATA3;
+	}
+	else if (scope->leftChild)
+	{		
+		c = article_calculation(coeff,scope->key,scope->quantite,head,list,check_realisable,1);
+		if (c)
+			product_needs(c,scope->leftChild,Branch,head,list,check_realisable);
+		else
+			return Branch;
 
-struct fournisseur
-{
-   DATA3 d;
-   struct fournisseur *next;
-};
-typedef struct fournisseur FOURNISSEUR;
+	}
+	else if (scope->rightChild)
+	{	
 
-struct data4
-{
-    char code[5];
-    char quantite[5];
-};
-typedef struct data4 DATA4;
-
-
-struct arbre_pro
- {
-    DATA4 d;
-    struct arbre_pro *frere ;
-    struct arbre_pro *fils ;
- };
-typedef struct arbre_pro ARBRE_PRO ;
-
-ARBRE_PRO *seek_noeud(ARBRE_PRO *racine,char code[5])
-{
-    ARBRE_PRO *p;
-    if(!racine)
-        return(NULL);
-    if (strcmp(((racine->d).code),code)==0)
-        return(racine);
-    if (p=seek_noeud(racine->frere,code))
-        return(p);
-    return(seek_noeud(racine->fils,code));
+		article_calculation(coeff,scope->key,scope->quantite,head,list,check_realisable,0);
+		product_needs(coeff,scope->rightChild,Branch,head,list,check_realisable);
+	}
+	else 
+	{
+		article_calculation(coeff,scope->key,scope->quantite,head,list,check_realisable,0);
+		return Branch;
+	}	
 }
-int est_fils(ARBRE_PRO *racine,ARBRE_PRO *p)
+leaf* getPlanDeProduction(void)
 {
-    if (racine)
-    {
-        if (racine==p)
-            return(1);
-        return (est_fils(racine->frere,p));
-    }
-    return (0);
+	char option[2],P[6],Q[6];
+	leaf *production_plan,*pr;
+	production_plan = NULL;
+	pr = NULL;
+	option[0]='x';
+	while(strcasecmp(option,"f") && strcasecmp(option,"k"))
+	{
+
+		printf("\n---How would you set a production plan ?\n File or keyboard [F/K]\n");
+		scanf("%1s",option);
+		
+	}
+	if (!strcasecmp(option,"k"))
+	{
+		printf("\nKeybord method set\ntype your production plan: \nP1 Q1\n.. ..\nPn Qn\nType 'exit' to end the production plan\n");
+		printf("\n>");
+		scanf("%5s %5s",P,Q);
+		while(strcasecmp(P,"exit"))
+		{
+			pr = make_leaf(P,Q);
+			pr->rightChild = production_plan;
+			production_plan = pr;
+			printf("\n>");
+			scanf("%5s %5s",P,Q);
+		}
+	}
+	else if (!strcasecmp(option,"f"))
+	{
+		FILE *programme = fopen("programme.txt","r");
+		fscanf(programme,"%5s %5s",P,Q);
+		while(strcasecmp(P,"exit"))
+		{
+			pr = make_leaf(P,Q);
+			pr->rightChild = production_plan;
+			production_plan = pr;
+			fscanf(programme,"%5s %5s",P,Q);
+		}	
+		fclose(programme);
+	}
+ return production_plan;
 }
-ARBRE_PRO *seek_pere(ARBRE_PRO *racine,ARBRE_PRO *p)
+void production_plan(leaf *root,article *head)
 {
-    ARBRE_PRO *pere;
-    if (!racine) return(NULL);
-    if (est_fils(racine->fils,p))
-        return(racine);
-    if (pere=seek_pere(racine->frere,p)) return(pere);
-    return(seek_pere(racine->fils,p));
-}
-//les fonctions  d'insertion
-void insert_article(ARTICLE **first,FILE * fp)
-{
-    char ligne [20];
-    while(fgets(ligne,45,fp))
-    {
+	article *art ,*p;
+	leaf *l,*pr,*plan;
+	int check_realisable,quantite_en_stock,coeff;
+	check_realisable = 1; //le plan de production est realisable
+	quantite_en_stock = 0;
+	coeff=1;
+	art = NULL;l=NULL;pr=NULL;plan=NULL;p=NULL;
+	l = getPlanDeProduction();
+	plan = l; 
+	while(plan)
+	{
+		pr = NULL;
+		find_leaf(root,root,plan->key,&pr);
+		if(pr)
+		{
+			sscanf(plan->quantite,"%i",&coeff);
+			coeff = article_calculation(coeff,pr->key,"1",head,&art,&check_realisable,1);//verifier s'il existe du produit finit en stock
+			product_needs(coeff,pr->leftChild,pr->leftChild,head,&art,&check_realisable);
+		}
 
-           ARTICLE *p;
-           p = (ARTICLE *) malloc(sizeof(ARTICLE));
-
-          sscanf(ligne,"%5s %15s %5s %10s %5s %5s",((p->d).code),((p->d).designation),((p->d).code_famille),((p->d).prix_achat),((p->d).code_fournisseur),((p->d).quantite_en_stock));
-           (p->next) = *first;
-           *first = p;
-    }
-}
-
-void insert_famile(FAMILLE **first,FILE * fp)
-{
-    char ligne [20];
-    while(fgets(ligne,21,fp))
-    {
-
-           FAMILLE *p;
-           p = (FAMILLE *) malloc(sizeof(FAMILLE));
-
-          sscanf(ligne,"%5s %15s",((p->d).code),((p->d).designation));
-           p->next = *first;
-           *first = p;
-    }
-}
-
-void insert_fournisseur(FOURNISSEUR **first,FILE * fp)
-{
-    char ligne[20];
-    while(fgets(ligne,21,fp))
-    {
-
-           FOURNISSEUR *p;
-           p = (FOURNISSEUR *) malloc(sizeof(FOURNISSEUR));
-
-          sscanf(ligne,"%5s %15s",((p->d).code),((p->d).raison_sociale));
-           (p->next) = *first;
-           *first = p;
-    }
-}
-
-void insert_procede (ARBRE_PRO **racine,FILE *fp)
-{
-    char ligne[20];
-    char code[5];
-    ARBRE_PRO *pere;
-    while (fgets(ligne,20,fp))
-    {
-        ARBRE_PRO *p;
-        p = (ARBRE_PRO *) malloc(sizeof(ARBRE_PRO));
-        sscanf(ligne,"%5s %5s %5s",code,((p->d).code),((p->d).quantite));
-        p->fils=NULL;
-        p->frere=NULL;
-        if ((pere=seek_noeud(*racine,code)))
-        {
-            (p->frere)=(pere->fils);
-            (pere->fils)=p;
-        }
-        else
-        {
-            pere = (ARBRE_PRO *) malloc(sizeof(ARBRE_PRO));
-            strcpy(((pere->d).code),code);
-            strcpy(((pere->d).quantite),"1");
-            (pere->fils)=p;
-            (pere->frere)=*racine;
-            *racine=pere;
-        }
-
-    }
-}
-
-void view_arbre(ARBRE_PRO *racine)
-{
-    if(racine)
-    {
-        puts ("*********");
-        view_arbre(racine->frere) ;
-
-        view_arbre(racine->fils);
-
-          puts(racine->d.code);
-          puts(racine->d.quantite);
-    }
-}
-/*/
-//fonctions pour afficher  un produit donner 1)
-int affiche_produit(ARBRE_PRO *racine)
-{
-    if (!racine)
-        return(0);
-    if (racine->fils)
-    {
-        affiche(racine);
-        affiche_produit(racine->fils);
-        affiche_produit(racine->frere);
-    }
-}
-
-int affiche(ARBRE_PRO *racine)
-{
-    char code[5];
-    strcpy(code,((racine->d).code));
-    return(print_ligne(code,(racine->fils)));
-
-}
-int print_ligne(char code[5],ARBRE_PRO *fils)
-{
-    if (fils)
-    {
-        printf("%s %s %s\n",code,((fils->d).code),((fils->d).quantite));
-        print_ligne(code,fils->frere);
-        return(1);
-    }
-    return(0);
-}
-
-//2)
-
-/*/
-// fonction open file
-int open_files(FILE **fp_art,FILE **fp_fam,FILE **fp_fou,FILE **fp_pro)
-{
-
-
-
-/*/
- if (!(fp_art=fopen("aricle.txt","r")))
-   {
-    printf("le fichier article.txt n'existe pas") ;
-    return (0) ;
-   }
-if (!(fp_fam=fopen("famille.txt","r")))
-   {
-    printf("le fichier famille.txt n'existe pas") ;
-    return (0) ;
-   }
-if (!( fp_fou = fopen("fourni.txt","r")))
-   {
-    printf("le fichier fournisseur.txt n'existe pas") ;
-    return (0) ;
-   }/*/
-if (!((*fp_pro)=fopen("procede.txt","r")))
-   {
-    printf("le fichier procede.txt n'existe pas") ;
-    return (0) ;
-   }
-   return(1) ;
-   }
-
-//fonction copy
-
-void copy_arbre(ARBRE_PRO* in ,ARBRE_PRO** out)
-{
-   if(in)
-{     (*out) =(ARBRE_PRO*)malloc(sizeof(ARBRE_PRO));
-
-
-       strcpy ((*out)->d.code,in->d.code);
-        strcpy ((*out)->d.quantite,in->d.quantite);
-       copy_arbre(in->frere,&((*out)->frere)) ;
-       copy_arbre(in->fils,&((*out)->fils)) ;
-
-   }
-}
-int main ()
-{
-    ARBRE_PRO *racine=NULL;
-    FILE *fp_art, *fp_fam, *fp_fou, *fp_pro ;
-
-if (!open_files(&fp_art,&fp_fam,&fp_fou,&fp_pro))
-    return (0);
-insert_procede (&racine,fp_pro);
- view_arbre(racine);
-
-
-
-}
-
-
-
+		plan=plan->rightChild;
+	}
+	if (check_realisable)
+	{
+		printf("\n------------------------------------------------\n");
+		printf("\n  Votre programme de Production est realisable\n");
+		printf("\n------------------------------------------------\n");
+	}
+	else
+	{
+		printf("\n_____________________________________________________________________________________\n");
+		printf("\n  Votre programme de production est irrealisable avec les données de stock valable   \n");
+		printf("  A fin de le realiser, veuiller completer les materiaux manquants lister si dessous \n");
+		p = art;
+		while(p)
+		{
+			sscanf(p->quantite_en_stock,"%i",&quantite_en_stock);
+				if(quantite_en_stock < 0)	
+					printf("\n\t%s\t%s\t%s\t%i",p->code,p->designation,p->prix_achat,-quantite_en_stock);
+			p = p->next;
+		}
+		printf("\n\n");
+		printf("\n_____________________________________________________________________________________\n");
+	}
